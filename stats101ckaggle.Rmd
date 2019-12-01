@@ -1,0 +1,137 @@
+---
+title: "Stats 101C Final Project"
+author: "Edwin Chau"
+date: "11/25/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load the dataset and libraries
+```{r}
+library(readr)
+library(glmnet)
+
+# change user before loading data
+user <- "Edwin"
+
+readtrain <- function() {
+  if (user == "Edwin") {
+    train <- read_csv("~/Stats 101C/train.csv")
+  }
+  if (user == "Roger") {
+    train <- read_csv("~/Downloads/fall-2019-stats-101c/train.csv")
+  }
+  if (user == "Joanna") {
+    
+  }
+  return(train)
+}
+
+readtest <- function() {
+  if (user == "Edwin") {
+    test <- read_csv("~/Stats 101C/test.csv")
+  }
+  if (user == "Roger") {
+    test <- read_csv("~/Downloads/fall-2019-stats-101c/test.csv")
+  }
+  if (user == "Joanna") {
+    
+  }
+  return(test)
+}
+
+```
+
+# Edwin
+
+### Format the data
+
+After loading the data we want to dummy code the categorical variables and separate the y values from the predictors. To dummy code we can create a design matrix. However, this might not work for the test data as we don't have y values to write a formula with.
+
+```{r}
+train <- readtrain()
+test <- readtest()
+
+wins <- train$HTWins
+#train <- scale(train[-c(1:8)])
+
+dmat <- model.matrix(HTWins ~ ., data=train)
+```
+
+### Lasso : Finding best lambda with CV
+
+```{r}
+# very long command, run at your own risk
+lassolog <- cv.glmnet(dmat, wins, alpha=1, family='binomial')
+
+grid <- 10^seq(10, -2, length=100)
+bestlam <- lassolog$lambda.min
+bestlam 
+```
+
+### Lasso Coefficients 
+
+```{r}
+lassocoef <- predict(glmnet(dmat, wins, alpha=1, family='binomial', 
+                            lambda=grid), type='coefficients', s=bestlam)
+## all nonzero predictors, 27 total
+lassocoef[which(lassocoef > 0), ]
+```
+
+There seems to only be 27 "useful" predictors. We can cross reference with Ridge results.
+
+### Ridge : Finding best lambda with CV
+```{r}
+
+```
+
+
+# Roger
+
+## Training
+```{r}
+train <- readtrain()
+train$HTWins = ifelse(train$HTWins == "Yes", 1, 0)
+```
+
+## Testing
+```{r}
+test <- readtest()
+```
+
+
+## Forward Stepwise
+```{r}
+library(MASS)
+forward_fit = glm(HTWins ~ ., data = train, family = "binomial")
+forward_fit = stepAIC(forward_fit, trace = F, direction = "forward")
+summary(forward_fit)
+
+important = coef(forward_fit)
+important[important > 0.1]
+
+log_fit = glm(HTWins ~ VTcumRest + HTcumRest + VT.TS.fgm + VT.TS.fga + 
+    VT.TS.tpa + VT.TS.fta + VT.TS.pts + VT.TA.tpa + VT.TA.fta + 
+    VT.OTA.dreb + VT.OTA.ast + VT.OTA.blk +
+    VT.S1.pts + VT.S1.ast + VT.S2.ast + VT.S3.ast + VT.S4.ast +
+    VT.S5.pts + VT.S5.min + VT.S5.stl + VT.OS1.plmin + 
+    VT.OS1.dreb + VT.OS1.fgm + VT.OS2.plmin + 
+    VT.OS2.dreb + VT.OS3.plmin + 
+    VT.OS3.dreb + VT.OS4.dreb + VT.pmxU , family = "binomial", data = train )
+summary(log_fit)
+```
+
+## Testing Predictions
+```{r}
+test_prob = predict(object = log_fit, newdata = test, type = "response")
+test_pred = ifelse(test_prob > 0.5, "Yes", "No")
+
+winners = data.frame(id = test$id, HTWins = test_pred)
+
+write.csv(winners, file = "predictions", row.names = F)
+
+```
+
