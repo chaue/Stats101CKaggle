@@ -136,6 +136,21 @@ log_fit = glm(HTWins ~ VTcumRest + HTcumRest + VT.TS.fgm + VT.TS.fga +
 summary(log_fit)
 ```
 
+
+##GAM's
+```{r}
+library(gam)
+gam_fit = gam(HTWins ~ VTcumRest + HTcumRest + VT.TS.fgm + VT.TS.fga + 
+    VT.TS.tpa + s(VT.TS.fta, df = 4) + s(VT.TS.pts, df = 7) + VT.TA.tpa + VT.TA.fta + 
+    s(VT.OTA.dreb, df = 7) + VT.OTA.ast + s(VT.OTA.blk, df = 7) +
+    VT.S1.pts + VT.S1.ast + VT.S2.ast + VT.S3.ast + VT.S4.ast +
+    VT.S5.pts + VT.S5.min + VT.S5.stl + VT.OS1.plmin + 
+    VT.OS1.dreb + VT.OS1.fgm + VT.OS2.plmin + 
+    VT.OS2.dreb + VT.OS3.plmin + 
+    VT.OS3.dreb + VT.OS4.dreb + VT.pmxU , family = "binomial", data = train )
+summary(gam_fit)
+```
+
 ## Testing Predictions
 ```{r}
 test_prob = predict(object = log_fit, newdata = test, type = "response")
