@@ -56,9 +56,10 @@ train <- readtrain()
 test <- readtest()
 
 wins <- train$HTWins
-#train <- scale(train[-c(1:8)])
+#train <- cbind(train[c(1:8)], scale(train[-c(1:8)]))
 
 dmat <- model.matrix(HTWins ~ ., data=train)
+testmat <- model.matrix( ~., data=test)
 ```
 
 ### Lasso : Finding best lambda with CV
@@ -75,13 +76,24 @@ bestlam
 ### Lasso Coefficients 
 
 ```{r}
-lassocoef <- predict(glmnet(dmat, wins, alpha=1, family='binomial', 
-                            lambda=grid), type='coefficients', s=bestlam)
+lassomod <- glmnet(dmat, wins, alpha=1, family='binomial', lambda=grid)
+lassocoef <- predict(lassomod, type='coefficients', s=bestlam)
+
 ## all nonzero predictors, 27 total
 lassocoef[which(lassocoef > 0), ]
 ```
 
-There seems to only be 27 "useful" predictors. We can cross reference with Ridge results.
+There seems to only be 36 "useful" predictors. We can cross reference with Ridge results.
+
+### Lasso Predictions
+
+```{r}
+predictions <- as.vector(predict(lassomod, s=bestlam, newx=testmat, type="response"))
+predictions <- ifelse(predictions > 0.5, "Yes", "No")
+
+write.csv(data.frame(id = test$id, HTWins = predictions), file = "predictions.csv", row.names = F)
+```
+
 
 ### Ridge : Finding best lambda with CV
 ```{r}
