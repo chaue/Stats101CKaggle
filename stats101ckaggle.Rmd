@@ -15,7 +15,7 @@ library(readr)
 library(glmnet)
 
 # change user before loading data
-user <- "Edwin"
+user <- "Roger"
 
 readtrain <- function() {
   if (user == "Edwin") {
@@ -125,15 +125,18 @@ summary(forward_fit)
 important = coef(forward_fit)
 important[important > 0.1]
 
-log_fit = glm(HTWins ~ VTcumRest + HTcumRest + VT.TS.fgm + VT.TS.fga + 
-    VT.TS.tpa + VT.TS.fta + VT.TS.pts + VT.TA.tpa + VT.TA.fta + 
+log_fit = glm(HTWins ~ VT.TS.fgm + VT.TS.fga + 
+    VT.TS.tpa + VT.TS.fta + VT.TS.pts + VTcumRest:VT.TA.tpa + VT.TA.fta + 
     VT.OTA.dreb + VT.OTA.ast + VT.OTA.blk +
     VT.S1.pts + VT.S1.ast + VT.S2.ast + VT.S3.ast + VT.S4.ast +
     VT.S5.pts + VT.S5.min + VT.S5.stl + VT.OS1.plmin + 
     VT.OS1.dreb + VT.OS1.fgm + VT.OS2.plmin + 
     VT.OS2.dreb + VT.OS3.plmin + 
-    VT.OS3.dreb + VT.OS4.dreb + VT.pmxU , family = "binomial", data = train )
+    VT.OS3.dreb + VT.OS4.dreb + VT.pmxU, family = "binomial", data = train )
 summary(log_fit)
+
+prop.table(table(winners$HTWins))
+prop.table(table(train$HTWins))
 ```
 
 
@@ -153,12 +156,46 @@ summary(gam_fit)
 
 ## Testing Predictions
 ```{r}
-test_prob = predict(object = log_fit, newdata = test, type = "response")
+test_prob = predict(object = gam_fit, newdata = test, type = "response")
 test_pred = ifelse(test_prob > 0.5, "Yes", "No")
 
 winners = data.frame(id = test$id, HTWins = test_pred)
+sum(winners$HTWins != winners2$HTWins)
+write.csv(winners, file = "predictions", row.names = F)
+
+```
+
+##Random Forest
+```{r}
+library(randomForest)
+
+classify = randomForest(HTWins ~ VTcumRest + HTcumRest + VT.TS.fgm + VT.TS.fga + 
+    VT.TS.tpa + VT.TS.fta + VT.TS.pts + VT.TA.tpa + VT.TA.fta + 
+    VT.OTA.dreb + VT.OTA.ast + VT.OTA.blk +
+    VT.S1.pts + VT.S1.ast + VT.S2.ast + VT.S3.ast + VT.S4.ast +
+    VT.S5.pts + VT.S5.min + VT.S5.stl + VT.OS1.plmin + 
+    VT.OS1.dreb + VT.OS1.fgm + VT.OS2.plmin + 
+    VT.OS2.dreb + VT.OS3.plmin + 
+    VT.OS3.dreb + VT.OS4.dreb + VT.pmxU, data = train)
+
+train$HTWins = as.factor(train$HTWins)
+
+test_prob = predict(object = classify, newdata = test, type = "response")
+
+winners = data.frame(id = test$id, HTWins = test_prob)
 
 write.csv(winners, file = "predictions", row.names = F)
 
+
+sum(winners$HTWins != winners2$HTWins)
+```
+
+## Correlations
+```{r}
+coors = cor(train[c("VTcumRest", "HTcumRest", "VT.TS.fgm", "VT.TS.fga", "VT.TS.tpa", "VT.TS.fta",
+            "VT.TS.pts", "VT.TA.tpa", "VT.TA.fta", "VT.OTA.dreb", "VT.OTA.ast", "VT.OTA.blk", "VT.S1.pts", "VT.S1.ast", "VT.S2.ast", "VT.S3.ast", "VT.S4.ast", "VT.S5.pts", "VT.S5.min", "VT.S5.stl", "VT.OS1.plmin", "VT.OS1.dreb", "VT.OS1.fgm", "VT.OS2.plmin", "VT.OS2.dreb", "VT.OS3.plmin", "VT.OS3.dreb", "VT.OS4.dreb", "VT.pmxU")])
+library(corrplot)
+
+corrplot(coors, method = "circle")
 ```
 
