@@ -51,7 +51,7 @@ readtest <- function() {
 
 After loading the data we want to dummy code the categorical variables and separate the y values from the predictors. To dummy code we can create a design matrix. However, this might not work for the test data as we don't have y values to write a formula with.
 
-```{r}
+```{r include=FALSE}
 train <- readtrain()
 test <- readtest()
 
@@ -95,9 +95,96 @@ write.csv(data.frame(id = test$id, HTWins = predictions), file = "predictions.cs
 ```
 
 
-### Ridge : Finding best lambda with CV
-```{r}
+Lasso using lasso
 
+Retrain a lasso model on the variables from previous lasso? Grasping at straws 
+```{r}
+lassopred <- model.matrix(HTWins ~ (VT.TA.dreb + VT.TA.ast + VT.TA.pts + VT.OTS.fgm + VT.OTS.ast + VT.OTS.stl +
+                    VT.OTS.blk + VT.OTS.pts + VT.OTA.blk + VT.OS1.plmin + VT.OS2.plmin + VT.OS3.plmin + VT.OS3.dreb + VT.OS4.plmin +
+                    VT.OS4.dreb + HT.TS.fgm + HT.TS.ast + HT.TS.stl + HT.TS.pts + HT.TA.blk + HT.OTA.dreb + HT.OTA.ast + HT.OTA.pts +
+                    HT.S1.plmin + HT.S1.pts + HT.S1.stl + HT.S2.pts + HT.S2.stl + HT.S3.plmin + HT.S3.pts + HT.S3.stl + HT.S4.pts)^2, data = train)
+
+lasso2 <- cv.glmnet(lassopred, wins, alpha=1, family="binomial")
+bestlam2 <- lasso2$lambda.min
+lassocoef2 <- predict(lasso2, type='coefficients', s=bestlam2)
+lassocoef2[which(lassocoef2 > 0), ]
+
+testmat <- model.matrix( ~ (VT.TA.dreb + VT.TA.ast + VT.TA.pts + VT.OTS.fgm + VT.OTS.ast + VT.OTS.stl +
+                    VT.OTS.blk + VT.OTS.pts + VT.OTA.blk + VT.OS1.plmin + VT.OS2.plmin + VT.OS3.plmin + VT.OS3.dreb + VT.OS4.plmin +
+                    VT.OS4.dreb + HT.TS.fgm + HT.TS.ast + HT.TS.stl + HT.TS.pts + HT.TA.blk + HT.OTA.dreb + HT.OTA.ast + HT.OTA.pts +
+                    HT.S1.plmin + HT.S1.pts + HT.S1.stl + HT.S2.pts + HT.S2.stl + HT.S3.plmin + HT.S3.pts + HT.S3.stl + HT.S4.pts)^2, data = test)
+
+pred2 <- as.vector(predict(lasso2, s=bestlam2, newx=testmat, type="response"))
+pred2 <- ifelse(pred2 > 0.5, "Yes", "No")
+
+write.csv(data.frame(id = test$id, HTWins = pred2), file = "lassointeract.csv", row.names = F)
+```
+
+
+Ridge over whole data set
+
+This got the highest testing error, which kinda makes sense since it keeps all the variables no matter how insignificant. Maybe add interaction terms for even higher accuracy
+```{r}
+bigridge <- cv.glmnet(model.matrix(HTWins~., data=train), wins, alpha=0, family="binomial")
+bestlam3 <- bigridge$lambda.min
+
+pred3 <- as.vector(predict(bigridge, type="response", s=bestlam3, newx=testmat))
+pred3 <- ifelse(pred3 > 0.5, "Yes", "No")
+table(pred3)
+
+write.csv(data.frame(id = test$id, HTWins = pred3), file = "ridge.csv", row.names = F)
+```
+
+
+
+### Backward fit 
+
+```{r}
+library(MASS)
+train$HTWins = ifelse(train$HTWins == "Yes", 1, 0)
+back_fit = glm(HTWins ~ VT.TA.dreb + VT.TA.ast + VT.TA.pts + VT.OTS.fgm + VT.OTS.ast + VT.OTS.stl +
+                VT.OTS.blk + VT.OTS.pts + VT.OTA.blk + VT.OS1.plmin + VT.OS2.plmin + VT.OS3.plmin + VT.OS3.dreb + VT.OS4.plmin +
+                VT.OS4.dreb + HT.TS.fgm + HT.TS.ast + HT.TS.stl + HT.TS.pts + HT.TA.blk + HT.OTA.dreb + HT.OTA.ast + HT.OTA.pts +
+                HT.S1.plmin + HT.S1.pts + HT.S1.stl + HT.S2.pts + HT.S2.stl + HT.S3.plmin + HT.S3.pts + HT.S3.stl + HT.S4.pts, 
+               data = train, family = "binomial")
+back_fit = stepAIC(back_fit, trace = F, direction = "both")
+
+back_fit = glm(HTWins ~ ., data = train, family = "binomial")
+back_fit = stepAIC(back_fit, trace = F, direction = "backward")
+summary(forward_fit)
+```
+
+
+### Undid the cumulative rest, lowered test error even further somehow
+```{r}
+train$HTcumRest <- c(train$HTcumRest[1],diff(train$HTcumRest))
+train$VTcumRest <- c(train$VTcumRest[1],diff(train$VTcumRest))
+test$HTcumRest <- c(test$HTcumRest[1],diff(test$HTcumRest))
+test$VTcumRest <- c(test$VTcumRest[1],diff(test$VTcumRest))
+
+train$HTWins = ifelse(train$HTWins == "Yes", 1, 0)
+gam_fit = gam(HTWins ~ VTcumRest + HTcumRest + VT.TS.fgm + VT.TS.fga + 
+    VT.TS.tpa + s(VT.TS.fta, df = 4) + s(VT.TS.pts, df = 7) + VT.TA.tpa + VT.TA.fta + 
+    s(VT.OTA.dreb, df = 7) + VT.OTA.ast + s(VT.OTA.blk, df = 7) +
+    VT.S1.pts + VT.S1.ast + VT.S2.ast + VT.S3.ast + VT.S4.ast +
+    VT.S5.pts + VT.S5.min + VT.S5.stl + VT.OS1.plmin + 
+    VT.OS1.dreb + VT.OS1.fgm + VT.OS2.plmin + 
+    VT.OS2.dreb + VT.OS3.plmin + 
+    VT.OS3.dreb + VT.OS4.dreb + VT.pmxU , family = "binomial", data = train)
+summary(gam_fit)
+
+pred <- predict(gam_fit, newdata=data.frame(test))
+pred <- ifelse(pred > 0.5, "Yes", "No")
+
+winners = data.frame(id = test$id, HTWins = pred)
+write.csv(winners, file = "fixedrest.csv", row.names = F)
+
+```
+
+### Plot correlations to find interactions
+```{r}
+library(corrplot)
+corrplot(cor(lassopred))
 ```
 
 
