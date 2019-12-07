@@ -193,7 +193,6 @@ corrplot(cor(lassopred))
 ## Training
 ```{r}
 train <- readtrain()
-train$HTWins = ifelse(train$HTWins == "Yes", 1, 0)
 ```
 
 ## Testing
@@ -255,17 +254,18 @@ write.csv(winners, file = "predictions", row.names = F)
 ##Random Forest
 ```{r}
 library(randomForest)
+train$VT = as.factor(train$VT)
+train$HT = as.factor(train$HT)
+train$VTleague = as.factor(train$VTleague)
+train$HTleague = as.factor(train$HTleague)
 
-classify = randomForest(HTWins ~ VTcumRest + HTcumRest + VT.TS.fgm + VT.TS.fga + 
-    VT.TS.tpa + VT.TS.fta + VT.TS.pts + VT.TA.tpa + VT.TA.fta + 
-    VT.OTA.dreb + VT.OTA.ast + VT.OTA.blk +
-    VT.S1.pts + VT.S1.ast + VT.S2.ast + VT.S3.ast + VT.S4.ast +
-    VT.S5.pts + VT.S5.min + VT.S5.stl + VT.OS1.plmin + 
-    VT.OS1.dreb + VT.OS1.fgm + VT.OS2.plmin + 
-    VT.OS2.dreb + VT.OS3.plmin + 
-    VT.OS3.dreb + VT.OS4.dreb + VT.pmxU, data = train)
+test$VT = as.factor(test$VT)
+test$HT = as.factor(test$HT)
+test$VTleague = as.factor(test$VTleague)
+test$HTleague = as.factor(test$HTleague)
 
-train$HTWins = as.factor(train$HTWins)
+classify = randomForest(factor(HTWins) ~. -id - gameID - date, data = train, important = T, trees = 9000)
+
 
 test_prob = predict(object = classify, newdata = test, type = "response")
 
@@ -273,8 +273,9 @@ winners = data.frame(id = test$id, HTWins = test_prob)
 
 write.csv(winners, file = "predictions", row.names = F)
 
-
+prop.table(table(winners$HTWins))
 sum(winners$HTWins != winners2$HTWins)
+importance(classify)
 ```
 
 ## Correlations
