@@ -125,9 +125,32 @@ Ridge over whole data set
 
 This got the highest testing error, which kinda makes sense since it keeps all the variables no matter how insignificant. Maybe add interaction terms for even higher accuracy
 ```{r}
-bigridge <- cv.glmnet(model.matrix(HTWins~., data=train), wins, alpha=0, family="binomial")
+dmatint <- model.matrix(HTWins ~ .^2, data=train[,-c(1:2, 4:5)])
+testmatint <- model.matrix(~ .^2, data=test)
+testmat <- cbind(model.matrix(~., data=test), testmatint[ ,c("VT.TS.tpm:VT.TS.tpa", "VT.TS.fta:VT.TA.pf", "VT.TS.stl:VT.TA.to", "VT.TS.pts:HT.pmxU",
+                       "VT.TA.fgm:VT.TA.fga", "VT.TA.fgm:VT.TA.pts", "VT.TA.tpm:VT.TA.tpa", "VT.OTS.tpm:VT.OTS.tpa", 
+                       "VT.OTS.fta:VT.OTA.pf", "VT.OTS.stl:VT.OTA.to", "VT.OTS.pts:VT.pmxU", "VT.OTA.fgm:VT.OTA.pts", 
+                       "VT.OTA.tpm:VT.OTA.tpa", "VT.S1.plmin:VT.S2.plmin", "VT.S1.plmin:VT.S3.plmin", "VT.S1.plmin:VT.S4.plmin", 
+                       "VT.S1.pts:HT.OS1.fgm", "VT.S2.plmin:VT.S3.plmin", "VT.S2.pts:HT.OS2.fgm", "VT.S3.plmin:VT.S4.plmin", 
+                       "VT.S3.pts:HT.OS3.fgm", "VT.S4.pts:HT.OS4.fgm", "VT.S5.pts:VT.S5.min", "VT.S5.pts:HT.OS5.fgm", "VT.S5.min:HT.OS5.fgm", 
+                       "VT.OS1.plmin:VT.OS2.plmin", "VT.OS1.plmin:VT.OS3.plmin", "VT.OS1.plmin:VT.OS4.plmin", "VT.OS1.fgm:HT.S1.pts", 
+                       "VT.OS2.plmin:VT.OS3.plmin", "VT.OS2.dreb:VT.OS2.oreb", "VT.OS2.fgm:HT.S2.pts", "VT.OS3.fgm:HT.S3.pts", 
+                       "VT.OS4.fgm:HT.S4.pts", "VT.OS5.fgm:HT.S5.pts", "VT.OS5.fgm:HT.S5.min", "VT.pmxW:HT.pmxW", "HT.S5.pts:HT.S5.min", 
+                       "HT.OS2.dreb:HT.OS2.oreb")])
+bigridge <- cv.glmnet(cbind(dmat, dmatint[ ,c("VT.TS.tpm:VT.TS.tpa", "VT.TS.fta:VT.TA.pf", "VT.TS.stl:VT.TA.to", "VT.TS.pts:HT.pmxU",
+                       "VT.TA.fgm:VT.TA.fga", "VT.TA.fgm:VT.TA.pts", "VT.TA.tpm:VT.TA.tpa", "VT.OTS.tpm:VT.OTS.tpa", 
+                       "VT.OTS.fta:VT.OTA.pf", "VT.OTS.stl:VT.OTA.to", "VT.OTS.pts:VT.pmxU", "VT.OTA.fgm:VT.OTA.pts", 
+                       "VT.OTA.tpm:VT.OTA.tpa", "VT.S1.plmin:VT.S2.plmin", "VT.S1.plmin:VT.S3.plmin", "VT.S1.plmin:VT.S4.plmin", 
+                       "VT.S1.pts:HT.OS1.fgm", "VT.S2.plmin:VT.S3.plmin", "VT.S2.pts:HT.OS2.fgm", "VT.S3.plmin:VT.S4.plmin", 
+                       "VT.S3.pts:HT.OS3.fgm", "VT.S4.pts:HT.OS4.fgm", "VT.S5.pts:VT.S5.min", "VT.S5.pts:HT.OS5.fgm", "VT.S5.min:HT.OS5.fgm", 
+                       "VT.OS1.plmin:VT.OS2.plmin", "VT.OS1.plmin:VT.OS3.plmin", "VT.OS1.plmin:VT.OS4.plmin", "VT.OS1.fgm:HT.S1.pts", 
+                       "VT.OS2.plmin:VT.OS3.plmin", "VT.OS2.dreb:VT.OS2.oreb", "VT.OS2.fgm:HT.S2.pts", "VT.OS3.fgm:HT.S3.pts", 
+                       "VT.OS4.fgm:HT.S4.pts", "VT.OS5.fgm:HT.S5.pts", "VT.OS5.fgm:HT.S5.min", "VT.pmxW:HT.pmxW", "HT.S5.pts:HT.S5.min", 
+                       "HT.OS2.dreb:HT.OS2.oreb")]), wins, alpha=0, family="binomial")
+
 bestlam3 <- bigridge$lambda.min
 
+ridgeintcoef <- predict(bigridge, type="coefficient", s=bestlam3)
 pred3 <- as.vector(predict(bigridge, type="response", s=bestlam3, newx=testmat))
 pred3 <- ifelse(pred3 > 0.5, "Yes", "No")
 table(pred3)
