@@ -25,7 +25,7 @@ readtrain <- function() {
     train <- read_csv("~/Downloads/fall-2019-stats-101c/train.csv")
   }
   if (user == "Joanna") {
-    
+    train <- read.csv("Stats 101C/train.csv")
   }
   return(train)
 }
@@ -38,7 +38,7 @@ readtest <- function() {
     test <- read_csv("~/Downloads/fall-2019-stats-101c/test.csv")
   }
   if (user == "Joanna") {
-    
+    test <- read.csv("Stats 101C/test.csv")
   }
   return(test)
 }
@@ -125,9 +125,32 @@ Ridge over whole data set
 
 This got the highest testing error, which kinda makes sense since it keeps all the variables no matter how insignificant. Maybe add interaction terms for even higher accuracy
 ```{r}
-bigridge <- cv.glmnet(model.matrix(HTWins~., data=train), wins, alpha=0, family="binomial")
+dmatint <- model.matrix(HTWins ~ .^2, data=train[,-c(1:2, 4:5)])
+testmatint <- model.matrix(~ .^2, data=test)
+testmat <- cbind(model.matrix(~., data=test), testmatint[ ,c("VT.TS.tpm:VT.TS.tpa", "VT.TS.fta:VT.TA.pf", "VT.TS.stl:VT.TA.to", "VT.TS.pts:HT.pmxU",
+                       "VT.TA.fgm:VT.TA.fga", "VT.TA.fgm:VT.TA.pts", "VT.TA.tpm:VT.TA.tpa", "VT.OTS.tpm:VT.OTS.tpa", 
+                       "VT.OTS.fta:VT.OTA.pf", "VT.OTS.stl:VT.OTA.to", "VT.OTS.pts:VT.pmxU", "VT.OTA.fgm:VT.OTA.pts", 
+                       "VT.OTA.tpm:VT.OTA.tpa", "VT.S1.plmin:VT.S2.plmin", "VT.S1.plmin:VT.S3.plmin", "VT.S1.plmin:VT.S4.plmin", 
+                       "VT.S1.pts:HT.OS1.fgm", "VT.S2.plmin:VT.S3.plmin", "VT.S2.pts:HT.OS2.fgm", "VT.S3.plmin:VT.S4.plmin", 
+                       "VT.S3.pts:HT.OS3.fgm", "VT.S4.pts:HT.OS4.fgm", "VT.S5.pts:VT.S5.min", "VT.S5.pts:HT.OS5.fgm", "VT.S5.min:HT.OS5.fgm", 
+                       "VT.OS1.plmin:VT.OS2.plmin", "VT.OS1.plmin:VT.OS3.plmin", "VT.OS1.plmin:VT.OS4.plmin", "VT.OS1.fgm:HT.S1.pts", 
+                       "VT.OS2.plmin:VT.OS3.plmin", "VT.OS2.dreb:VT.OS2.oreb", "VT.OS2.fgm:HT.S2.pts", "VT.OS3.fgm:HT.S3.pts", 
+                       "VT.OS4.fgm:HT.S4.pts", "VT.OS5.fgm:HT.S5.pts", "VT.OS5.fgm:HT.S5.min", "VT.pmxW:HT.pmxW", "HT.S5.pts:HT.S5.min", 
+                       "HT.OS2.dreb:HT.OS2.oreb")])
+bigridge <- cv.glmnet(cbind(dmat, dmatint[ ,c("VT.TS.tpm:VT.TS.tpa", "VT.TS.fta:VT.TA.pf", "VT.TS.stl:VT.TA.to", "VT.TS.pts:HT.pmxU",
+                       "VT.TA.fgm:VT.TA.fga", "VT.TA.fgm:VT.TA.pts", "VT.TA.tpm:VT.TA.tpa", "VT.OTS.tpm:VT.OTS.tpa", 
+                       "VT.OTS.fta:VT.OTA.pf", "VT.OTS.stl:VT.OTA.to", "VT.OTS.pts:VT.pmxU", "VT.OTA.fgm:VT.OTA.pts", 
+                       "VT.OTA.tpm:VT.OTA.tpa", "VT.S1.plmin:VT.S2.plmin", "VT.S1.plmin:VT.S3.plmin", "VT.S1.plmin:VT.S4.plmin", 
+                       "VT.S1.pts:HT.OS1.fgm", "VT.S2.plmin:VT.S3.plmin", "VT.S2.pts:HT.OS2.fgm", "VT.S3.plmin:VT.S4.plmin", 
+                       "VT.S3.pts:HT.OS3.fgm", "VT.S4.pts:HT.OS4.fgm", "VT.S5.pts:VT.S5.min", "VT.S5.pts:HT.OS5.fgm", "VT.S5.min:HT.OS5.fgm", 
+                       "VT.OS1.plmin:VT.OS2.plmin", "VT.OS1.plmin:VT.OS3.plmin", "VT.OS1.plmin:VT.OS4.plmin", "VT.OS1.fgm:HT.S1.pts", 
+                       "VT.OS2.plmin:VT.OS3.plmin", "VT.OS2.dreb:VT.OS2.oreb", "VT.OS2.fgm:HT.S2.pts", "VT.OS3.fgm:HT.S3.pts", 
+                       "VT.OS4.fgm:HT.S4.pts", "VT.OS5.fgm:HT.S5.pts", "VT.OS5.fgm:HT.S5.min", "VT.pmxW:HT.pmxW", "HT.S5.pts:HT.S5.min", 
+                       "HT.OS2.dreb:HT.OS2.oreb")]), wins, alpha=0, family="binomial")
+
 bestlam3 <- bigridge$lambda.min
 
+ridgeintcoef <- predict(bigridge, type="coefficient", s=bestlam3)
 pred3 <- as.vector(predict(bigridge, type="response", s=bestlam3, newx=testmat))
 pred3 <- ifelse(pred3 > 0.5, "Yes", "No")
 table(pred3)
@@ -285,5 +308,118 @@ coors = cor(train[c("VTcumRest", "HTcumRest", "VT.TS.fgm", "VT.TS.fga", "VT.TS.t
 library(corrplot)
 
 corrplot(coors, method = "circle")
+```
+
+
+
+# Joanna
+```{r}
+library(readr)
+library(MASS)
+library(leaps)
+test <- read.csv("Stats 101C/test.csv")
+train <- read.csv("Stats 101C/train.csv")
+train=train[,c(3,11:ncol(train))]
+```
+
+## t-test
+```{r}
+ index<-c()
+for (i in 2:ncol(train))
+{
+  yes=train[train$HTWins=="Yes",i]
+  no=train[train$HTWins=="No",i]
+  pv<-t.test(yes,no)
+ 
+  if(pv$p.value<0.001)
+  {
+    index=c(index,i)
+  }
+}
+index
+```
+
+### train dataset with only significant variables
+```{r}
+train=train[,c(1,index)]
+```
+
+### correlation matrix
+```{r}
+cor=cor(train[-1])
+```
+
+### train dataset deleting high correlation variables
+```{r}
+train=train[,-c(4,5,13,14,22,25,26,33,34,35,36,44,105,114,128,136,137,147)]
+```
+
+
+## forward selection
+```{r}
+regfwd=regsubsets(HTWins~.,data=train,method="forward",nvmax=96)
+sum=summary(regfwd)
+par(mfrow=c(2,2))
+plot(sum$rss,xlab="number of predictors",ylab="RSS",type="l")
+plot(sum$cp,xlab="number of predictors",ylab="Cp",type="l")
+plot(sum$bic,xlab="number of predictors",ylab="BIC",type="l")
+plot(sum$adjr2,xlab="number of predictors",ylab="Adjusted R^2",type="l")
+```
+
+### smallest test MSE
+```{r}
+train$HTWins<- as.numeric(train$HTWins)
+test.mat=model.matrix(HTWins~.,data=train)
+val.errors=c()
+for (i in 1:95)
+{
+  coefi=coef(regfwd,id=i)
+  pred=test.mat[,names(coefi)]%*% coefi
+  val.errors[i]=mean((train$HTWins-pred)^2)
+}
+which.min(val.errors)
+```
+
+### only # variables data set
+```{r}
+coef=coef(regfwd,78)
+names=names(coef)[-1]
+train_30=train[,c("HTWins",names)]
+```
+
+### split training set into train and test
+```{r}
+set.seed(1)
+train_ind=sample(length(train$HTWins),length(train$HTWins)/2)
+test_ind=-train_ind
+train_1=train_30[train_ind,]
+test_1=train_30[test_ind,]
+```
+
+### logistic
+```{r}
+train_1$HTWins<-as.factor(train_1$HTWins)
+log<- glm(HTWins~.,data=train_1,family=binomial)
+```
+
+### checking accuracy
+```{r}
+set.seed(1)
+glm.probs=predict(log,test_1,type="response")
+glm.pred=rep("Yes",nrow(test_1))
+glm.pred[glm.probs<0.5]="No"
+test_1$HTWins=ifelse(test_1$HTWins=="1","No","Yes")
+table(glm.pred,test_1$HTWins)
+mean(glm.pred==test_1$HTWins)
+```
+
+### final csv
+```{r}
+test_prob = predict(object = log, newdata = test, type = "response")
+test_pred = ifelse(test_prob > 0.5, "Yes", "No")
+
+winners = data.frame(id = test$id, HTWins = test_pred)
+
+write.csv(winners, file = "model_log", row.names = F)
 ```
 
