@@ -1,0 +1,136 @@
+---
+title: "Final_Report"
+author: "Valid Models: Edwin Chau, Joanna Jin, Roger Yuan"
+date: "12/8/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+The goal of this project was to predict whether a home team won a basketball game given the values for each predictor. We generated a design matrix using the training data to create dummy variables for our team and league variables. We also reformatted the date variable to reflect the number of days since the first date, though this turned out to not impact the model performances. 
+
+
+```{r message=FALSE, warning=FALSE}
+#Load Libraries and Data
+
+library(readr)
+library(glmnet)
+
+train <- read_csv("~/Downloads/fall-2019-stats-101c/train.csv")
+test <- read_csv("~/Downloads/fall-2019-stats-101c/test.csv")
+
+wins <- train$HTWins
+#train <- cbind(train[c(1:8)], scale(train[-c(1:8)]))
+
+dmat <- model.matrix(HTWins ~ ., data=train)
+testmat <- model.matrix( ~., data=test)
+```
+
+
+## Lasso
+```{r lasso, cache = TRUE}
+# very long command, run at your own risk
+lassolog <- cv.glmnet(dmat, wins, alpha=1, family='binomial')
+
+grid <- 10^seq(10, -2, length=100)
+bestlam <- lassolog$lambda.min
+
+lassomod <- glmnet(dmat, wins, alpha=1, family='binomial', lambda=grid)
+pred_lasso <- predict(lassomod, s=bestlam, newx = dmat, type="response")
+pred_lasso <- ifelse(pred_lasso > 0.5, "Yes", "No")
+
+knitr::kable(prop.table(table(predicted = pred_lasso, actual = train$HTWins)))
+LASSO_MSE = mean(pred_lasso == train$HTWins)
+```
+
+####Lasso Training MSE: `r LASSO_MSE`
+
+Our first attempt was to try a LASSO logistic regression model, which would perform both variable selection and prediction simultaneously. This model was a good start, but was the worst of our three top attempts. It had a public and private score of 0.6614. 
+
+The LASSO model produced 36 predictors, setting the insignificant ones to zero. We fitted this model using 10 fold cross validation, which gave us an optimal $\lambda$ that was then used to predict wins for the test set. Normally we would need to standardize our predictors, as ones with large magnitudes will have smaller coefficients. LASSO would then filter predictors with extremely small coefficients, as they are seen to be insignificant. However, the glmnet function standardizes internally, so we don’t need to format the data ahead of time.
+
+Our hope for the LASSO model was that it would make the daunting task of modeling 217 predictors a bit easier to manage by filtering out the less "important" ones. However, while LASSO makes a model more interpretable by filtering, a Ridge logistic model would ultimately have the edge when it comes to predicting accuracy. Thus, we moved on to fitting a Ridge model in the hopes it would improve our score. 
+
+
+
+## Ridge With Interactions
+```{r Ridge, cache = TRUE}
+dmatint <- model.matrix(HTWins ~ .^2, data=train[,-c(1:2, 4:5)])
+testmatint <- model.matrix(~ .^2, data=test)
+testmat <- cbind(model.matrix(~., data=test), testmatint[ ,c("VT.TS.tpm:VT.TS.tpa", "VT.TS.fta:VT.TA.pf", "VT.TS.stl:VT.TA.to", "VT.TS.pts:HT.pmxU",
+                       "VT.TA.fgm:VT.TA.fga", "VT.TA.fgm:VT.TA.pts", "VT.TA.tpm:VT.TA.tpa", "VT.OTS.tpm:VT.OTS.tpa", 
+                       "VT.OTS.fta:VT.OTA.pf", "VT.OTS.stl:VT.OTA.to", "VT.OTS.pts:VT.pmxU", "VT.OTA.fgm:VT.OTA.pts", 
+                       "VT.OTA.tpm:VT.OTA.tpa", "VT.S1.plmin:VT.S2.plmin", "VT.S1.plmin:VT.S3.plmin", "VT.S1.plmin:VT.S4.plmin", 
+                       "VT.S1.pts:HT.OS1.fgm", "VT.S2.plmin:VT.S3.plmin", "VT.S2.pts:HT.OS2.fgm", "VT.S3.plmin:VT.S4.plmin", 
+                       "VT.S3.pts:HT.OS3.fgm", "VT.S4.pts:HT.OS4.fgm", "VT.S5.pts:VT.S5.min", "VT.S5.pts:HT.OS5.fgm", "VT.S5.min:HT.OS5.fgm", 
+                       "VT.OS1.plmin:VT.OS2.plmin", "VT.OS1.plmin:VT.OS3.plmin", "VT.OS1.plmin:VT.OS4.plmin", "VT.OS1.fgm:HT.S1.pts", 
+                       "VT.OS2.plmin:VT.OS3.plmin", "VT.OS2.dreb:VT.OS2.oreb", "VT.OS2.fgm:HT.S2.pts", "VT.OS3.fgm:HT.S3.pts", 
+                       "VT.OS4.fgm:HT.S4.pts", "VT.OS5.fgm:HT.S5.pts", "VT.OS5.fgm:HT.S5.min", "VT.pmxW:HT.pmxW", "HT.S5.pts:HT.S5.min", 
+                       "HT.OS2.dreb:HT.OS2.oreb")])
+
+ridge_train = cbind(dmat, dmatint[ ,c("VT.TS.tpm:VT.TS.tpa", "VT.TS.fta:VT.TA.pf", "VT.TS.stl:VT.TA.to", "VT.TS.pts:HT.pmxU",
+                       "VT.TA.fgm:VT.TA.fga", "VT.TA.fgm:VT.TA.pts", "VT.TA.tpm:VT.TA.tpa", "VT.OTS.tpm:VT.OTS.tpa", 
+                       "VT.OTS.fta:VT.OTA.pf", "VT.OTS.stl:VT.OTA.to", "VT.OTS.pts:VT.pmxU", "VT.OTA.fgm:VT.OTA.pts", 
+                       "VT.OTA.tpm:VT.OTA.tpa", "VT.S1.plmin:VT.S2.plmin", "VT.S1.plmin:VT.S3.plmin", "VT.S1.plmin:VT.S4.plmin", 
+                       "VT.S1.pts:HT.OS1.fgm", "VT.S2.plmin:VT.S3.plmin", "VT.S2.pts:HT.OS2.fgm", "VT.S3.plmin:VT.S4.plmin", 
+                       "VT.S3.pts:HT.OS3.fgm", "VT.S4.pts:HT.OS4.fgm", "VT.S5.pts:VT.S5.min", "VT.S5.pts:HT.OS5.fgm", "VT.S5.min:HT.OS5.fgm", 
+                       "VT.OS1.plmin:VT.OS2.plmin", "VT.OS1.plmin:VT.OS3.plmin", "VT.OS1.plmin:VT.OS4.plmin", "VT.OS1.fgm:HT.S1.pts", 
+                       "VT.OS2.plmin:VT.OS3.plmin", "VT.OS2.dreb:VT.OS2.oreb", "VT.OS2.fgm:HT.S2.pts", "VT.OS3.fgm:HT.S3.pts", 
+                       "VT.OS4.fgm:HT.S4.pts", "VT.OS5.fgm:HT.S5.pts", "VT.OS5.fgm:HT.S5.min", "VT.pmxW:HT.pmxW", "HT.S5.pts:HT.S5.min", 
+                       "HT.OS2.dreb:HT.OS2.oreb")])
+
+
+bigridge <- cv.glmnet(ridge_train, wins, alpha = 0, family="binomial")
+
+bestlam <- bigridge$lambda.min
+
+
+pred_ridge <- predict(bigridge, type="response", s=bestlam, newx = ridge_train)
+pred_ridge <- ifelse(pred_ridge > 0.5, "Yes", "No")
+
+knitr::kable(prop.table(table(predicted = pred_ridge, actual = train$HTWins)))
+ridge_MSE = mean(pred_ridge == train$HTWins)
+```
+
+####Ridge Training MSE: `r ridge_MSE`
+
+
+Our Ridge model had a public score of 0.66747 and private score of 0.67597. This was a slight improvement on LASSO, which makes sense due to the fact that it does not filter out predictors. By merely shrinking their coefficients and therefore their influence on predictions, the Ridge model could still keep that information around to give it a slight edge over LASSO in terms of accuracy. 
+
+Fitting the Ridge model had an identical process to the LASSO. We used cross validation to identify the optimal $\lambda$ before making our predictions. In an effort to improve the Ridge model further, we added interaction terms to the existing training data. We did this by computing the correlations between predictors and selecting the ones with a correlation greater than 0.7. This resulted in a model with a public score of 0.66868 and a private score of 0.67839.
+
+Adding interaction terms did not improve our original Ridge model by much in terms of predictive accuracy. This makes sense in hindsight because Ridge has a regularization term that shrinks coefficients towards 0. Linear regression struggles with high correlation between predictors because standard error estimates for these predictors would increase and make predictions more variable. However, Ridge reduces this problem with a regularization term, thus including interactions did not ultimately change much, though it did give the model more features to predict with and increased our accuracy ever so slightly. 
+
+
+##Elastic Net
+```{r Elastic, cache = TRUE}
+elastic_net = cv.glmnet(ridge_train, wins, alpha = 0.3, family="binomial")
+
+
+bestlam2 <- elastic_net$lambda.min
+
+pred_elastic <- predict(elastic_net, type = "response", s = bestlam2, newx = ridge_train)
+pred_elastic <- ifelse(pred_elastic > 0.5, "Yes", "No")
+
+knitr::kable(prop.table(table(predicted = pred_elastic, actual = train$HTWins)))
+Elastic_MSE = mean(pred_elastic == train$HTWins)
+```
+
+####Elastic Net MSE: `r Elastic_MSE`
+
+To achieve a balance between the variable selection feature of LASSO regression and the higher prediction accuracy of ridge regression, we looked into Elastic Net regularization as another option. Elastic Net combines the penalties of Ridge and LASSO to get the best of both worlds. By setting the alpha term in glmnet to 0.3, we opted for an Elastic Net model that performs more similar as a Ridge model, encouraging grouping for correlated variables, and also reduces random noise brought along by insignificant predictors. This model yielded a public score of 0.66626 and a private score of 0.68082.
+
+
+##CV Error for all Models
+```{r}
+plot(bigridge$cvm, type = "l", col = "red", xlab = "model", ylab = "Cross Validation Error")
+
+lines(lassolog$cvm, col = "blue", lty = 2)
+
+lines(elastic_net$cvm, col = "purple", lty = 3)
+
+legend(60, 1.32, legend=c("Ridge", "LASSO", "Elastic Net"),
+       col=c("red", "blue", "purple"), lty = 1:3, cex = 0.8)
+```
